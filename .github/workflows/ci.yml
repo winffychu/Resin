@@ -14,6 +14,7 @@ on:
   push:
     branches:
       - master
+      - dev
   pull_request:
     branches:
       - master
@@ -79,7 +80,7 @@ jobs:
           OUTPUT_NAME=resin-${GOOS}-${GOARCH}
           if [ "$GOOS" = "windows" ]; then OUTPUT_NAME="${OUTPUT_NAME}.exe"; fi
           mkdir -p build
-          go build -trimpath -tags "with_quic with_wireguard with_grpc with_utls with_embedded_tor with_naive_outbound with_purego" \
+          go build -trimpath -tags "with_quic with_wireguard with_grpc with_utls with_embedded_tor with_naive_outbound with_purego with_gvisor" \
             -o build/${OUTPUT_NAME} ./cmd/resin
           ls -la build
 
