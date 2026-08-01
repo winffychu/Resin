@@ -41,7 +41,7 @@ describe("ThemeProvider", () => {
     const listeners: ((e: { matches: boolean }) => void)[] = [];
     let matches = false;
     vi.spyOn(window, "matchMedia").mockImplementation(
-      (q: string) =>
+      (_q: string) =>
         ({
           matches,
           addEventListener: (_t: string, l: (e: { matches: boolean }) => void) => listeners.push(l),
@@ -69,7 +69,7 @@ describe("ThemeProvider", () => {
     const listeners: ((e: { matches: boolean }) => void)[] = [];
     let matches = false;
     vi.spyOn(window, "matchMedia").mockImplementation(
-      (q: string) =>
+      (_q: string) =>
         ({
           matches,
           addEventListener: (_t: string, l: (e: { matches: boolean }) => void) => listeners.push(l),
