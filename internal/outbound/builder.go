@@ -5,17 +5,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/endpoint"
 	"github.com/sagernet/sing-box/adapter/inbound"
 	sbOutbound "github.com/sagernet/sing-box/adapter/outbound"
+	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/dns"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/route"
 	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/json/badjson"
 	sJson "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/pause"
@@ -45,6 +48,7 @@ type SingboxBuilder struct {
 	ctx                 context.Context
 	logFactory          log.Factory
 	networkManager      *route.NetworkManager
+	endpointManager     *endpoint.Manager
 	dnsTransportManager *dns.TransportManager
 	dnsRouter           *dns.Router
 }
@@ -152,6 +156,7 @@ func NewSingboxBuilderWithConfig(cfg SingboxBuilderConfig) (*SingboxBuilder, err
 		ctx:                 ctx,
 		logFactory:          logFactory,
 		networkManager:      networkMgr,
+		endpointManager:      endpointMgr,
 		dnsTransportManager: dnsTransportMgr,
 		dnsRouter:           dnsRouter,
 	}, nil
@@ -161,6 +166,23 @@ func NewSingboxBuilderWithConfig(cfg SingboxBuilderConfig) (*SingboxBuilder, err
 // type/tag fields) into a real adapter.Outbound and runs it through the
 // lifecycle stages.
 func (b *SingboxBuilder) Build(rawOptions json.RawMessage) (adapter.Outbound, error) {
+	// sing-box v1.13 移除了 wireguard 的 outbound 注册，统一改成 endpoint 类型
+	// (option.WireGuardEndpointOptions)。旧 outbound JSON 在 v1.13 走 option.Outbound
+	// 解析会立即报 "unknown outbound type: wireguard"，所以必须先 peek 顶层 type，
+	// 在进 option.Outbound 解析之前就把 wireguard 改走到 EndpointManager 路径。
+	// 下面的 buildWireGuardEndpoint 复刻 option.Outbound.UnmarshalJSONContext 的
+	// dispatch，但走 adapter.EndpointRegistry 而非 OutboundOptionsRegistry。
+	type outboundHeader struct {
+		Type string `json:"type"`
+	}
+	var header outboundHeader
+	if err := sJson.UnmarshalContext(b.ctx, rawOptions, &header); err != nil {
+		return nil, fmt.Errorf("parse outbound header: %w", err)
+	}
+	if header.Type == C.TypeWireGuard {
+		return b.buildWireGuardEndpoint(rawOptions)
+	}
+
 	// 1. Parse via official option.Outbound path (strips type/tag, creates
 	//    typed options via OutboundOptionsRegistry + badjson.UnmarshallExcluded).
 	var outboundConfig option.Outbound
@@ -174,7 +196,7 @@ func (b *SingboxBuilder) Build(rawOptions json.RawMessage) (adapter.Outbound, er
 		b.ctx,
 		nil, // router — not needed for simple dialing
 		logger,
-		outboundConfig.Tag,
+		outboundConfig.Type,
 		outboundConfig.Type,
 		outboundConfig.Options,
 	)
@@ -193,6 +215,79 @@ func (b *SingboxBuilder) Build(rawOptions json.RawMessage) (adapter.Outbound, er
 	return ob, nil
 }
 
+// buildWireGuardEndpoint handles the v1.13+ WireGuard endpoint schema by
+// registering it through EndpointManager and returning the endpoint as an
+// adapter.Outbound (the Endpoint interface embeds Outbound at the type level).
+func (b *SingboxBuilder) buildWireGuardEndpoint(rawOptions json.RawMessage) (adapter.Outbound, error) {
+	// 1. Dispatch rawOptions to option.WireGuardEndpointOptions via the Endpoint
+	// registry, mirroring option.Outbound.UnmarshalJSONContext. We let
+	// EndpointRegistry.CreateOptions("wireguard") return a typed options pointer
+	// (matching option.WireGuardEndpointOptions), then badjson excludes the
+	// header (type/tag) fields and fills the typed options. This must use the
+	// sing json path to support Listable[netip.Prefix] (Address/allowed_ips)
+	// and badoption.Duration (udp_timeout) custom unmarshalers.
+	endpointRegistry := service.FromContext[adapter.EndpointRegistry](b.ctx)
+	if endpointRegistry == nil {
+		return nil, fmt.Errorf("singbox builder: missing endpoint registry in context")
+	}
+	options, loaded := endpointRegistry.CreateOptions(C.TypeWireGuard)
+	if !loaded {
+		return nil, fmt.Errorf("singbox builder: endpoint type %s not registered (build without with_wireguard?)", C.TypeWireGuard)
+	}
+	wgOpt, ok := options.(*option.WireGuardEndpointOptions)
+	if !ok {
+		return nil, fmt.Errorf("singbox builder: endpoint options for wireguard: unexpected type %T", options)
+	}
+	// endpointHeader mirrors option.Outbound's _Outbound: the top-level fields
+	// that UnmarshallExcludedContext allows on top of the per-type options.
+	type endpointHeader struct {
+		Type string `json:"type"`
+		Tag  string `json:"tag,omitempty"`
+	}
+	var header endpointHeader
+	if err := sJson.UnmarshalContext(b.ctx, rawOptions, &header); err != nil {
+		return nil, fmt.Errorf("parse wireguard endpoint header: %w", err)
+	}
+	if err := badjson.UnmarshallExcludedContext(b.ctx, rawOptions, &header, wgOpt); err != nil {
+		return nil, fmt.Errorf("parse wireguard endpoint options: %w", err)
+	}
+	tag := strings.TrimSpace(header.Tag)
+	if tag == "" {
+		return nil, fmt.Errorf("wireguard endpoint: tag is required")
+	}
+
+	logger := b.logFactory.NewLogger("endpoint/wireguard")
+
+	// 2. Create via EndpointManager. router=nil: Resin uses these WireGuard
+	// endpoints as detour outbounds (.Dial); they don't need a sing-box router
+	// for routing decisions — same router=nil stance as the outbound path.
+	if err := b.endpointManager.Create(
+		b.ctx, nil, logger, tag, C.TypeWireGuard, wgOpt,
+	); err != nil {
+		return nil, fmt.Errorf("create wireguard endpoint [%s]: %w", tag, err)
+	}
+
+	// 3. Get the registered endpoint. It embeds adapter.Outbound at the type
+	// level (adapter.Endpoint = Lifecycle + Outbound), so returning it directly
+	// as adapter.Outbound is a Go-legal interface upcast.
+	ep, ok := b.endpointManager.Get(tag)
+	if !ok {
+		return nil, fmt.Errorf("wireguard endpoint [%s]: not found after create", tag)
+	}
+
+	// 4. Lifecycle start. EndpointManager.Create does not start endpoints when
+	// the manager itself is not started; mirror the outbound path and start
+	// each stage explicitly (matching what box.applyOutbounds does for endpoints).
+	for _, stage := range adapter.ListStartStages {
+		if err := adapter.LegacyStart(ep, stage); err != nil {
+			_ = common.Close(ep)
+			return nil, fmt.Errorf("wireguard endpoint start %s [%s]: %w", stage, tag, err)
+		}
+	}
+
+	return ep, nil
+}
+
 // Close shuts down the builder's internal DNS services.
 func (b *SingboxBuilder) Close() error {
 	var errs []error
@@ -201,6 +296,9 @@ func (b *SingboxBuilder) Close() error {
 	}
 	if b.dnsTransportManager != nil {
 		errs = append(errs, b.dnsTransportManager.Close())
+	}
+	if b.endpointManager != nil {
+		errs = append(errs, b.endpointManager.Close())
 	}
 	if b.networkManager != nil {
 		errs = append(errs, b.networkManager.Close())

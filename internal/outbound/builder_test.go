@@ -475,12 +475,20 @@ func TestSingboxBuilder_ParseExtendedProtocols(t *testing.T) {
 			raw: json.RawMessage(`{
 				"type":"wireguard",
 				"tag":"test-wg",
-				"server":"127.0.0.1",
-				"server_port":2480,
-				"local_address":["172.16.0.2/32","fd01::1/128"],
+				"address":["172.16.0.2/32","fd01::1/128"],
 				"private_key":"eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=",
-				"peer_public_key":"Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo="
+				"peers":[
+					{
+						"address":"127.0.0.1",
+						"port":2480,
+						"public_key":"Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=",
+						"allowed_ips":["0.0.0.0/0","::/0"]
+					}
+				]
 			}`),
+			// wireguard 作为 endpoint 类型注册；release 构建标签 with_wireguard
+			// 启用协议，无该标签时缺码注册成 endpoint registry 找不到，但本测试
+			// 不依赖 anytls/with_naive_outbound 之外的特殊 build tag。
 			missingFeatureHint: "WireGuard is not included in this build",
 		},
 		{
@@ -591,11 +599,16 @@ func TestSingboxBuilder_ParseDomainServerProtocols(t *testing.T) {
 			raw: json.RawMessage(`{
 				"type":"wireguard",
 				"tag":"test-wg-domain",
-				"server":"wg.example.com",
-				"server_port":2480,
-				"local_address":["172.16.0.2/32","fd01::1/128"],
+				"address":["172.16.0.2/32","fd01::1/128"],
 				"private_key":"eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=",
-				"peer_public_key":"Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo="
+				"peers":[
+					{
+						"address":"wg.example.com",
+						"port":2480,
+						"public_key":"Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=",
+						"allowed_ips":["0.0.0.0/0","::/0"]
+					}
+				]
 			}`),
 			missingFeatureHint: "WireGuard is not included in this build",
 		},

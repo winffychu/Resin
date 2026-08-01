@@ -1396,6 +1396,12 @@ func convertClashProxyToNode(proxy map[string]any) (ParsedNode, bool) {
 		applyClashDialFields(outbound, proxy)
 		return buildParsedNode(outbound)
 	case "wireguard", "wg":
+		// sing-box v1.11+ 把 WireGuard 从 outbound 类型改为 endpoint 类型；v1.13
+		// 已无 outbound wireguard 注册，新 schema: address/private_key/mtu/peers[]
+		// (peer 字段: address/port/public_key/pre_shared_key/allowed_ips/reserved/
+		//  persistent_keepalive_interval)。这里把 Clash/Surge 风格的 WireGuard 节点
+		// 转成新 endpoint schema，由 builder.Build 路径识别 type=="wireguard" 时
+		// 改走 EndpointManager.Create 而非 OutboundRegistry.CreateOutbound。
 		privateKey := strings.TrimSpace(getString(proxy, "private-key", "private_key"))
 		publicKey := strings.TrimSpace(getString(proxy, "public-key", "public_key"))
 		localAddress := parseWireGuardLocalAddress(proxy)
@@ -1406,30 +1412,28 @@ func convertClashProxyToNode(proxy map[string]any) (ParsedNode, bool) {
 		if privateKey == "" || publicKey == "" || len(localAddress) == 0 {
 			return ParsedNode{}, false
 		}
-		outbound := map[string]any{
-			"type":            "wireguard",
-			"tag":             defaultTag(tag, "wireguard", server, port),
-			"server":          server,
-			"server_port":     port,
-			"private_key":     privateKey,
-			"peer_public_key": publicKey,
-			"local_address":   localAddress,
-		}
 		peer := map[string]any{
-			"server":      server,
-			"server_port": port,
+			"address":     server,
+			"port":        port,
 			"public_key":  publicKey,
 			"allowed_ips": allowedIPs,
 		}
 		if preSharedKey := strings.TrimSpace(getString(proxy, "pre-shared-key", "pre_shared_key")); preSharedKey != "" {
-			outbound["pre_shared_key"] = preSharedKey
 			peer["pre_shared_key"] = preSharedKey
 		}
 		if reserved, ok := getUint8Array(proxy, "reserved"); ok && len(reserved) == 3 {
-			outbound["reserved"] = reserved
 			peer["reserved"] = reserved
 		}
-		outbound["peers"] = []map[string]any{peer}
+		if keepalive, ok := getUint(proxy, "persistent-keepalive-interval", "persistent_keepalive_interval"); ok {
+			peer["persistent_keepalive_interval"] = keepalive
+		}
+		outbound := map[string]any{
+			"type":        "wireguard",
+			"tag":         defaultTag(tag, "wireguard", server, port),
+			"address":     localAddress,
+			"private_key": privateKey,
+			"peers":       []map[string]any{peer},
+		}
 		if mtu, ok := getUint(proxy, "mtu"); ok {
 			outbound["mtu"] = mtu
 		}
