@@ -62,8 +62,9 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   resolved: resolvePref(initialPref),
   setPref: (pref) => {
     persistPref(pref);
-    set({ pref, resolved: resolvePref(pref) });
-    applyResolvedToDOM(resolvePref(pref));
+    const next = resolvePref(pref);
+    set({ pref, resolved: next });
+    applyResolvedToDOM(next);
   },
   cyclePref: () => {
     const current = get().pref;
@@ -95,8 +96,12 @@ export function getThemePref(): ThemePref {
   return useThemeStore.getState().pref;
 }
 
-// 测试辅助：在 beforeEach 中重置到给定 pref（含 resolved + DOM 同步）。
-// 非测试代码不应调用，生产中 pref 应通过 setPref 改变。
+/**
+ * 测试辅助：在 beforeEach 中重置到给定 pref（含 resolved + DOM 同步）。
+ * 非测试代码不应调用，生产中 pref 应通过 setPref 改变。
+ *
+ * @internal 仅供单元测试使用；不在稳定 API 契约中。
+ */
 export function resetThemeStoreForTesting(pref: ThemePref = "system") {
   const resolved = resolvePref(pref);
   useThemeStore.setState({ pref, resolved });
