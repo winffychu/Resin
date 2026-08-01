@@ -10,8 +10,8 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/puzpuzpuz/xsync/v4 v4.4.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sagernet/sing v0.7.18
-	github.com/sagernet/sing-box v1.12.21
+	github.com/sagernet/sing v0.8.12-0.20260726145744-ef2df370afca
+	github.com/sagernet/sing-box v1.13.15
 	github.com/zeebo/xxh3 v1.0.2
 	golang.org/x/net v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
