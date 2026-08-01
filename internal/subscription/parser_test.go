@@ -458,11 +458,22 @@ func TestParseGeneralSubscription_ClashJSON_NewProtocolsAndDialFields(t *testing
 	if got := wireGuard["private_key"]; got != "priv-key" {
 		t.Fatalf("wireguard private_key: got %v", got)
 	}
-	if got := wireGuard["peer_public_key"]; got != "pub-key" {
-		t.Fatalf("wireguard peer_public_key: got %v", got)
+	// sing-box v1.13 wireguard 改为 endpoint schema：peer 信息收进 peers[]，
+	// 顶层不再有 peer_public_key/pre_shared_key/server/server_port，地址列表
+	// 字段名从 local_address 改为 address，reserved/pre_shared_key 移到 peer。
+	peers, ok := wireGuard["peers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("wireguard peers: want []map[string]any, got %T", wireGuard["peers"])
 	}
-	if got := wireGuard["pre_shared_key"]; got != "psk" {
-		t.Fatalf("wireguard pre_shared_key: got %v", got)
+	if len(peers) != 1 {
+		t.Fatalf("wireguard peers length: got %d, want 1", len(peers))
+	}
+	peer := peers[0]
+	if got := peer["public_key"]; got != "pub-key" {
+		t.Fatalf("wireguard peer.public_key: got %v", got)
+	}
+	if got := peer["pre_shared_key"]; got != "psk" {
+		t.Fatalf("wireguard peer.pre_shared_key: got %v", got)
 	}
 	if got := wireGuard["network"]; got != "tcp" {
 		t.Fatalf("wireguard network: got %v", got)
@@ -470,16 +481,22 @@ func TestParseGeneralSubscription_ClashJSON_NewProtocolsAndDialFields(t *testing
 	if got := wireGuard["domain_strategy"]; got != "prefer_ipv4" {
 		t.Fatalf("wireguard domain_strategy: got %v", got)
 	}
-	localAddress := mustSliceField(t, wireGuard, "local_address")
-	if !containsAnyString(localAddress, "172.16.0.2/32") {
-		t.Fatalf("wireguard local_address missing ipv4 entry: %v", localAddress)
+	// parser 产出的 address 是 []string（parseWireGuardLocalAddress 返回类型），
+	// 不是 []any — mustSliceField 内部做 .([]any) 断言会失败，这里直接断言 []string。
+	localAddress, ok := wireGuard["address"].([]string)
+	if !ok {
+		t.Fatalf("wireguard address: want []string, got %T", wireGuard["address"])
 	}
-	if !containsAnyString(localAddress, "fd01::1/128") {
-		t.Fatalf("wireguard local_address missing ipv6 entry: %v", localAddress)
+	if !sliceContainsString(localAddress, "172.16.0.2/32") {
+		t.Fatalf("wireguard address missing ipv4 entry: %v", localAddress)
 	}
-	topReserved := mustSliceField(t, wireGuard, "reserved")
-	if len(topReserved) != 3 {
-		t.Fatalf("wireguard reserved length: got %d", len(topReserved))
+	if !sliceContainsString(localAddress, "fd01::1/128") {
+		t.Fatalf("wireguard address missing ipv6 entry: %v", localAddress)
+	}
+	// getUint8Array 返回 []int（每个元素是 0-255 的 int），不是 []uint8。
+	peerReserved, ok := peer["reserved"].([]int)
+	if !ok || len(peerReserved) != 3 {
+		t.Fatalf("wireguard peer.reserved: want []int of len 3, got %T len %d", peerReserved, len(peerReserved))
 	}
 
 	hysteria := byTag["hy-test"]
@@ -763,16 +780,20 @@ func TestParseGeneralSubscription_ClashJSON_WireGuardMissingAllowedIPsUsesDefaul
 	if got := wireGuard["type"]; got != "wireguard" {
 		t.Fatalf("wireguard type: got %v", got)
 	}
-	peers := mustSliceField(t, wireGuard, "peers")
+	peers, ok := wireGuard["peers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("wireguard peers: want []map[string]any, got %T", wireGuard["peers"])
+	}
 	if len(peers) != 1 {
 		t.Fatalf("wireguard peers length: got %d", len(peers))
 	}
-	firstPeer, ok := peers[0].(map[string]any)
+	firstPeer := peers[0]
+	// parser 产出的 allowed_ips 是 []string（parseWireGuardAllowedIPs 返回类型）。
+	allowedIPs, ok := firstPeer["allowed_ips"].([]string)
 	if !ok {
-		t.Fatalf("wireguard peers[0] expected map[string]any, got %T", peers[0])
+		t.Fatalf("wireguard allowed_ips: want []string, got %T", firstPeer["allowed_ips"])
 	}
-	allowedIPs := mustSliceField(t, firstPeer, "allowed_ips")
-	if !containsAnyString(allowedIPs, "0.0.0.0/0") || !containsAnyString(allowedIPs, "::/0") {
+	if !sliceContainsString(allowedIPs, "0.0.0.0/0") || !sliceContainsString(allowedIPs, "::/0") {
 		t.Fatalf("wireguard allowed_ips: got %v", allowedIPs)
 	}
 }
@@ -2702,21 +2723,37 @@ peer = (public-key = pub-key, allowed-ips = "0.0.0.0/0, ::/0", endpoint = engage
 	if got := obj["type"]; got != "wireguard" {
 		t.Fatalf("type: got %v", got)
 	}
-	if got := obj["server"]; got != "engage.cloudflareclient.com" {
-		t.Fatalf("server: got %v", got)
+	// sing-box v1.13 把 wireguard 改成 endpoint：server/server_port 迁到 peer
+	// (address/port)，local_address 改名 address，peer_public_key 进 peers[0]。
+	peers, ok := obj["peers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("peers: want []map[string]any, got %T", obj["peers"])
 	}
-	if got := obj["server_port"]; got != float64(2408) {
-		t.Fatalf("server_port: got %v", got)
+	if len(peers) != 1 {
+		t.Fatalf("peers length: got %d, want 1", len(peers))
+	}
+	peer := peers[0]
+	if got := peer["address"]; got != "engage.cloudflareclient.com" {
+		t.Fatalf("peer.address: got %v", got)
+	}
+	if got := peer["port"]; got != float64(2408) {
+		t.Fatalf("peer.port: got %v", got)
 	}
 	if got := obj["private_key"]; got != "priv-key" {
 		t.Fatalf("private_key: got %v", got)
 	}
-	if got := obj["peer_public_key"]; got != "pub-key" {
-		t.Fatalf("peer_public_key: got %v", got)
+	if got := peer["public_key"]; got != "pub-key" {
+		t.Fatalf("peer.public_key: got %v", got)
 	}
-	localAddress := mustSliceField(t, obj, "local_address")
-	if !containsAnyString(localAddress, "172.16.0.2/32") {
-		t.Fatalf("local_address: got %v", localAddress)
+	// parser emits address as []string (via parseWireGuardLocalAddress from
+	// the ip/ipv6 fields), so assert []string directly — mustSliceField's
+	// .([]any) assertion would fail on the concrete []string type.
+	localAddress, ok := obj["address"].([]string)
+	if !ok {
+		t.Fatalf("address: want []string, got %T", obj["address"])
+	}
+	if !sliceContainsString(localAddress, "172.16.0.2/32") {
+		t.Fatalf("address: got %v", localAddress)
 	}
 }
 
@@ -2919,6 +2956,20 @@ func mustSliceField(t *testing.T, obj map[string]any, key string) []any {
 }
 
 func containsAnyString(values []any, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
+// sliceContainsString is the []string counterpart of containsAnyString. The
+// wireguard endpoint schema emits address/allowed_ips as []string
+// (parseWireGuardLocalAddress/parseWireGuardAllowedIPs return []string, not
+// []any), so mustSliceField's .([]any) assertion would fail — callers assert
+// []string directly and use this helper.
+func sliceContainsString(values []string, expected string) bool {
 	for _, value := range values {
 		if value == expected {
 			return true
