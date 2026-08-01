@@ -6,6 +6,10 @@ on:
       - master
     tags:
       - 'v*' # Trigger on tags starting with v, e.g., v1.0.0, v1.0.0-rc.1
+  # Allow manual dispatch (no-op vs push semantics) so that trigger-condition
+  # changes can be validated without waiting for GitHub to re-index push rules,
+  # and so build can be re-run from the Actions UI on any commit.
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
