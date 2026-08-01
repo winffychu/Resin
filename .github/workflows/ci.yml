@@ -1,0 +1,123 @@
+name: CI
+
+# 独立验证流水线：在 release.yml 之外验证 go.mod/go.sum 与前端构建、
+# 跑 go test —— 不影响 tag 触发的 publish/docker 流。
+#
+# 建立背景：fork 内某次 sing-box 升级到 v1.13.15 只改了 go.mod，
+# go.sum 仍只有 v1.12.21 的 h1 条目，release.yml 的 `go build` 因此
+# 报 `missing go.sum entry` 失败。本 workflow 在 CI 上跑 `go mod tidy`
+# 把缺失的哈希补出来，并将生成的 go.mod / go.sum 作为 artifact
+# 上传以便下载回仓库，避免本地依赖 Go 工具链。
+# 验证通过后，可决定是否把同样改动并入 release.yml。
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  webui:
+    name: Build WebUI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install & Build
+        working-directory: ./webui
+        run: |
+          npm ci
+          npm run build
+          npm run test:run
+
+  go:
+    name: Go (tidy + build + test)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+
+      - name: go mod tidy (补齐 go.sum 中缺失的 h1 条目)
+        run: |
+          go mod tidy -v
+          # 打印 tidy 后的 go.sum 是否变化，便于检查
+          if git diff --quiet -- go.mod go.sum; then
+            echo "::notice::go.mod/go.sum unchanged after tidy"
+          else
+            echo "::notice::go.mod/go.sum changed after tidy (will be uploaded as artifact)"
+            git --no-pager diff -- go.mod go.sum
+          fi
+
+      - name: Build Go Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          OUTPUT_NAME=resin-${GOOS}-${GOARCH}
+          if [ "$GOOS" = "windows" ]; then OUTPUT_NAME="${OUTPUT_NAME}.exe"; fi
+          mkdir -p build
+          go build -trimpath -tags "with_quic with_wireguard with_grpc with_utls with_embedded_tor with_naive_outbound" \
+            -o build/${OUTPUT_NAME} ./cmd/resin
+          ls -la build
+
+      - name: Upload generated go.mod / go.sum
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-lock
+          path: |
+            go.mod
+            go.sum
+          retention-days: 14
+
+  # 只在 linux/amd64 跑测试矩阵（其它平台的 go test 受交叉编译限）。
+  go-test:
+    name: Go test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+
+      - name: go mod tidy
+        run: go mod tidy -v
+
+      - name: go test
+        run: go test ./...
