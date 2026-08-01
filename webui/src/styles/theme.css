@@ -14,6 +14,54 @@
   --warning: #af7b00;
   --shadow: 0 18px 40px rgba(42, 86, 149, 0.11);
   --radius: 18px;
+  /* 幽灵 token: 此前未在 :root 定义、靠业务 tsx 写死 fallback 的语义变量,
+     此处补齐 light 值，dark 覆盖层在下方块各设一套，去掉 fallback 唯一真相。 */
+  --text-secondary: #7a8898;
+  --surface-sunken: rgba(0, 0, 0, 0.02);
+  --delete-btn-color: #c33a2f;
+  --accent-primary: #1470ff;
+  --chart-grid: rgba(65, 87, 121, 0.16);
+  --chart-tick: #657691;
+  --chart-cursor: rgba(15, 94, 216, 0.34);
+  --chart-cursor-fill: rgba(15, 94, 216, 0.08);
+  --chart-dot-stroke: #ffffff;
+  --chart-bar-top: #2388ff;
+  --chart-bar-bottom: #0f5ed8;
+  --chart-active-bar-fill: #0d63dd;
+  --chart-active-bar-stroke: #f2f7ff;
+  --chart-bar-fill: rgba(16, 118, 255, 0.86);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1419;
+  --bg-soft: #131820;
+  --surface: rgba(28, 34, 42, 0.86);
+  --surface-strong: #1b2129;
+  --text: #e6eaf0;
+  --text-muted: #93a0b3;
+  --border: rgba(160, 180, 210, 0.14);
+  --primary: #4d96ff;
+  --primary-strong: #6ba8ff;
+  --primary-soft: rgba(77, 150, 255, 0.18);
+  --success: #2fb886;
+  --danger: #f06b5c;
+  --warning: #d99b1f;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
+  --radius: 18px;
+  --text-secondary: #7f8ea3;
+  --surface-sunken: rgba(255, 255, 255, 0.04);
+  --delete-btn-color: #f06b5c;
+  --accent-primary: #4d96ff;
+  --chart-grid: rgba(160, 180, 210, 0.14);
+  --chart-tick: #93a0b3;
+  --chart-cursor: rgba(77, 150, 255, 0.5);
+  --chart-cursor-fill: rgba(77, 150, 255, 0.16);
+  --chart-dot-stroke: #1b2129;
+  --chart-bar-top: #2f74ff;
+  --chart-bar-bottom: #1a4fd0;
+  --chart-active-bar-fill: #4d96ff;
+  --chart-active-bar-stroke: #0f1419;
+  --chart-bar-fill: rgba(77, 150, 255, 0.86);
 }
 
 * {
@@ -35,6 +83,14 @@ body {
     radial-gradient(circle at 85% 0%, rgba(255, 173, 85, 0.2), transparent 42%),
     linear-gradient(180deg, #fcfeff, #f2f7ff 60%, #eef4ff);
   line-height: 1.45;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 16% 22%, rgba(77, 150, 255, 0.12), transparent 36%),
+    radial-gradient(circle at 85% 0%, rgba(217, 155, 31, 0.1), transparent 42%),
+    linear-gradient(180deg, #0f1419, #131820 60%, #11161d);
+  color-scheme: dark;
 }
 
 h1,
@@ -101,6 +157,11 @@ a {
   overflow: hidden;
 }
 
+:root[data-theme="dark"] .sidebar {
+  background: linear-gradient(180deg, rgba(20, 25, 32, 0.9), rgba(15, 20, 25, 0.95));
+  border-right-color: var(--border);
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -120,6 +181,11 @@ a {
   background: #fff;
   /* border: 1px solid var(--border); */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="dark"] .brand-logo {
+  background: var(--surface-strong);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
 }
 
 .brand-logo img {
@@ -194,6 +260,10 @@ a {
   min-width: 0;
 }
 
+:root[data-theme="dark"] .nav-item {
+  color: var(--text-muted);
+}
+
 .nav-item span {
   min-width: 0;
   white-space: nowrap;
@@ -206,11 +276,22 @@ a {
   border-color: var(--border);
 }
 
+:root[data-theme="dark"] .nav-item:hover {
+  background: rgba(27, 33, 41, 0.78);
+}
+
 .nav-item-active {
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(20, 112, 255, 0.23);
   color: var(--primary-strong);
   box-shadow: inset 0 0 0 1px rgba(20, 112, 255, 0.08);
+}
+
+:root[data-theme="dark"] .nav-item-active {
+  background: rgba(27, 33, 41, 0.96);
+  border-color: rgba(77, 150, 255, 0.32);
+  color: var(--primary-strong);
+  box-shadow: inset 0 0 0 1px rgba(77, 150, 255, 0.16);
 }
 
 .sidebar-bottom {
@@ -273,6 +354,10 @@ a {
   background: rgba(255, 255, 255, 0.78);
 }
 
+:root[data-theme="dark"] .locale-switch {
+  background: rgba(27, 33, 41, 0.78);
+}
+
 .locale-switch-btn {
   border: none;
   border-radius: 8px;
@@ -310,10 +395,19 @@ a {
   transition: 0.2s ease;
 }
 
+:root[data-theme="dark"] .locale-switch-compact {
+  background: rgba(27, 33, 41, 0.82);
+}
+
 .locale-switch-compact:hover {
   color: var(--text);
   border-color: rgba(20, 112, 255, 0.25);
   background: rgba(20, 112, 255, 0.08);
+}
+
+:root[data-theme="dark"] .locale-switch-compact:hover {
+  border-color: rgba(77, 150, 255, 0.32);
+  background: rgba(77, 150, 255, 0.14);
 }
 
 .locale-switch-compact span {
@@ -324,6 +418,76 @@ a {
 .sidebar-locale {
   margin-top: 0;
   margin-left: auto;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  color: var(--text);
+}
+
+.theme-toggle-btn-active {
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+}
+
+.theme-toggle-compact {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-muted);
+  min-height: 34px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+:root[data-theme="dark"] .theme-toggle-compact {
+  background: rgba(27, 33, 41, 0.82);
+}
+
+.theme-toggle-compact:hover {
+  color: var(--text);
+  border-color: rgba(20, 112, 255, 0.25);
+  background: rgba(20, 112, 255, 0.08);
+}
+
+:root[data-theme="dark"] .theme-toggle-compact:hover {
+  border-color: rgba(77, 150, 255, 0.32);
+  background: rgba(77, 150, 255, 0.14);
+}
+
+.theme-toggle-compact span {
+  min-width: 2ch;
+  text-align: center;
 }
 
 .main {
@@ -482,6 +646,12 @@ a {
   box-shadow: 0 8px 22px rgba(22, 108, 241, 0.28);
 }
 
+:root[data-theme="dark"] .btn-primary {
+  background: linear-gradient(135deg, #2f74ff, #1a4fd0);
+  color: #0f1419;
+  box-shadow: 0 8px 22px rgba(31, 79, 208, 0.32);
+}
+
 .btn-primary:hover:enabled {
   transform: translateY(-1px);
   box-shadow: 0 14px 26px rgba(22, 108, 241, 0.34);
@@ -493,11 +663,23 @@ a {
   color: #1f2a3f;
 }
 
+:root[data-theme="dark"] .btn-secondary {
+  background: rgba(27, 33, 41, 0.9);
+  color: var(--text);
+}
+
 .btn-secondary:hover:enabled,
 .btn-ghost:hover:enabled {
   border-color: rgba(20, 112, 255, 0.25);
   background: rgba(20, 112, 255, 0.08);
   color: #0e4ca9;
+}
+
+:root[data-theme="dark"] .btn-secondary:hover:enabled,
+:root[data-theme="dark"] .btn-ghost:hover:enabled {
+  border-color: rgba(77, 150, 255, 0.32);
+  background: rgba(77, 150, 255, 0.14);
+  color: var(--primary-strong);
 }
 
 .btn-ghost {
@@ -506,9 +688,19 @@ a {
   color: var(--text-muted);
 }
 
+:root[data-theme="dark"] .btn-ghost {
+  background: rgba(27, 33, 41, 0.7);
+  color: var(--text-muted);
+}
+
 .btn-danger {
   color: #fff;
   background: linear-gradient(135deg, #cf503f, #bf2f2f);
+}
+
+:root[data-theme="dark"] .btn-danger {
+  color: #1a0c0a;
+  background: linear-gradient(135deg, #f06b5c, #d0452f);
 }
 
 .input,
@@ -3499,3 +3691,99 @@ a {
     transform: translateY(-20px) scale(0.92);
   }
 }
+
+/* =========================================================
+   Dark theme 集中覆盖层 — 仅当 <html data-theme="dark"> 时生效
+   策略：light 主题完全不变；此处统一翻转高频"白色半透明浮起/遮罩"装饰，
+        以及 badge / callout / tooltip / modal / row 等组件的写死浅色。
+        变量层语义 (--bg/--surface/--text/...) 已在上 :root[data-theme="dark"]
+        块覆盖，此处只补装饰色。
+   ========================================================= */
+
+:root[data-theme="dark"] .badge-neutral {
+  color: var(--text-muted);
+  background: rgba(160, 180, 210, 0.12);
+}
+
+:root[data-theme="dark"] .badge-info,
+:root[data-theme="dark"] .request-logs-proxy-badge-forward {
+  color: #a8c4f4;
+  background: rgba(77, 150, 255, 0.16);
+}
+
+:root[data-theme="dark"] .badge-muted {
+  color: var(--text-muted);
+  background: rgba(160, 180, 210, 0.12);
+}
+
+:root[data-theme="dark"] .badge-accent,
+:root[data-theme="dark"] .request-logs-proxy-badge-reverse {
+  color: #c9a3e6;
+  background: rgba(145, 65, 200, 0.2);
+}
+
+:root[data-theme="dark"] .badge-success {
+  color: #7fe0c4;
+  background: rgba(47, 184, 134, 0.18);
+}
+
+:root[data-theme="dark"] .badge-warning {
+  color: #f0c96a;
+  background: rgba(217, 155, 31, 0.18);
+}
+
+:root[data-theme="dark"] .badge-danger {
+  color: #f4a59b;
+  background: rgba(240, 107, 92, 0.18);
+}
+
+:root[data-theme="dark"] .callout {
+  background: var(--surface);
+}
+
+:root[data-theme="dark"] .callout-success {
+  color: #7fe0c4;
+  border-color: rgba(47, 184, 134, 0.32);
+  background: rgba(47, 184, 134, 0.12);
+}
+
+:root[data-theme="dark"] .callout-error {
+  color: #f4a59b;
+  border-color: rgba(240, 107, 92, 0.32);
+  background: rgba(240, 107, 92, 0.12);
+}
+
+:root[data-theme="dark"] .callout-warning {
+  color: #f0c96a;
+  border-color: rgba(217, 155, 31, 0.32);
+  background: rgba(217, 155, 31, 0.12);
+}
+
+/* 通用：把剩余高频"白色半透明浮起/遮罩"在 dark 下统一翻为深色等价值。
+   规则选择器仅命中确实使用 rgba(255,255,255,*) 的白底浮层组件。 */
+:root[data-theme="dark"] .trend-tooltip,
+:root[data-theme="dark"] .histogram-tooltip {
+  background: rgba(27, 33, 41, 0.94);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .modal,
+:root[data-theme="dark"] .modal-header,
+:root[data-theme="dark"] .drawer-panel,
+:root[data-theme="dark"] .popover,
+:root[data-theme="dark"] .select-menu {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .row:hover,
+:root[data-theme="dark"] .data-table-row:hover {
+  background: rgba(27, 33, 41, 0.78);
+}
+
+:root[data-theme="dark"] .row.active,
+:root[data-theme="dark"] .data-table-row.active {
+  background: rgba(77, 150, 255, 0.12);
+}
+

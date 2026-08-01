@@ -20,4 +20,22 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // 测试文件：vitest 注入 describe/it/expect/beforeEach 等全局。
+    files: ['**/*.test.{ts,tsx}', 'src/test/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        vi: 'readonly',
+      },
+    },
+  },
 ])

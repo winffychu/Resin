@@ -10,6 +10,7 @@ import { useI18n } from "../../i18n";
 import { getCurrentLocale, isEnglishLocale } from "../../i18n/locale";
 import { apiRequest } from "../../lib/api-client";
 import { formatApiErrorMessage } from "../../lib/error-message";
+import { useChartColors, useSeriesPalette } from "../theme/chart-tokens";
 import type {
   HistoryAccessLatencyResponse,
   HistoryLeaseLifetimeResponse,
@@ -531,6 +532,7 @@ function EmptyChart({ text }: { text: string }) {
 }
 
 function TrendLineChart({ data, lines, yTickFormatter, tooltipValueFormatter, emptyText }: TrendLineChartProps) {
+  const colors = useChartColors();
   if (!data.length || !lines.length) {
     return <EmptyChart text={emptyText} />;
   }
@@ -543,7 +545,7 @@ function TrendLineChart({ data, lines, yTickFormatter, tooltipValueFormatter, em
       <div className="trend-svg">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 8, bottom: 4, left: 8 }}>
-            <CartesianGrid stroke="rgba(65, 87, 121, 0.16)" strokeDasharray="2 4" vertical={false} />
+            <CartesianGrid stroke={colors.gridStroke} strokeDasharray="2 4" vertical={false} />
             <XAxis
               dataKey="label"
               interval="preserveStartEnd"
@@ -551,19 +553,19 @@ function TrendLineChart({ data, lines, yTickFormatter, tooltipValueFormatter, em
               tickMargin={4}
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#607191", fontSize: 11, fontWeight: 600 }}
+              tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
             />
             <YAxis
               width="auto"
               tickMargin={4}
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#657691", fontSize: 11, fontWeight: 600 }}
+              tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
               tickFormatter={(value) => formatYAxis(toNumber(value))}
               domain={[0, "auto"]}
             />
             <Tooltip
-              cursor={{ stroke: "rgba(15, 94, 216, 0.34)", strokeWidth: 1 }}
+              cursor={{ stroke: colors.tooltipCursorStroke, strokeWidth: 1 }}
               wrapperStyle={{ outline: "none" }}
               content={<TrendTooltipContent lines={lines} valueFormatter={formatTooltip} />}
             />
@@ -576,7 +578,7 @@ function TrendLineChart({ data, lines, yTickFormatter, tooltipValueFormatter, em
                 stroke={line.color}
                 strokeWidth={1.8}
                 dot={false}
-                activeDot={{ r: 3, stroke: "#ffffff", strokeWidth: 1, fill: line.color }}
+                activeDot={{ r: 3, stroke: colors.dotStroke, strokeWidth: 1, fill: line.color }}
                 isAnimationActive={false}
                 connectNulls
               />
@@ -637,6 +639,7 @@ function toHistogramBarPoints(buckets: LatencyBucket[]): HistogramBarPoint[] {
 }
 
 function LatencyHistogram({ buckets, emptyText }: LatencyHistogramProps) {
+  const colors = useChartColors();
   if (!buckets.length) {
     return <EmptyChart text={emptyText} />;
   }
@@ -650,7 +653,7 @@ function LatencyHistogram({ buckets, emptyText }: LatencyHistogramProps) {
     <div className="histogram-chart">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 6, right: 8, bottom: 4, left: 8 }}>
-          <CartesianGrid stroke="rgba(65, 87, 121, 0.16)" strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridStroke} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="label"
             interval="preserveStartEnd"
@@ -658,7 +661,7 @@ function LatencyHistogram({ buckets, emptyText }: LatencyHistogramProps) {
             tickMargin={4}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#607191", fontSize: 11, fontWeight: 600 }}
+            tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
             tickFormatter={(value) => formatLatency(toNumber(value))}
           />
           <YAxis
@@ -667,17 +670,17 @@ function LatencyHistogram({ buckets, emptyText }: LatencyHistogramProps) {
             tickMargin={4}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#607191", fontSize: 11, fontWeight: 600 }}
+            tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
             tickFormatter={(value) => formatShortNumber(toNumber(value))}
           />
           <Tooltip
-            cursor={{ fill: "rgba(15, 94, 216, 0.08)" }}
+            cursor={{ fill: colors.tooltipCursorFill }}
             wrapperStyle={{ outline: "none" }}
             content={<HistogramTooltipContent />}
           />
           <Bar
             dataKey="count"
-            fill="rgba(16, 118, 255, 0.86)"
+            fill={colors.barFill}
             radius={[5, 5, 0, 0]}
             maxBarSize={28}
             isAnimationActive={false}
@@ -690,6 +693,7 @@ function LatencyHistogram({ buckets, emptyText }: LatencyHistogramProps) {
 
 export function PlatformMonitorPanel({ platform }: { platform: Platform }) {
   const { locale, t } = useI18n();
+  const palette = useSeriesPalette();
   const [rangeKey, setRangeKey] = useState<RangeKey>("6h");
 
   const realtimeQuery = useQuery({
@@ -916,7 +920,7 @@ export function PlatformMonitorPanel({ platform }: { platform: Platform }) {
             data={leaseTrendData}
             emptyText={t("暂无租约实时数据")}
             yTickFormatter={formatShortNumber}
-            lines={[{ dataKey: "active_leases", name: t("活跃租约"), color: "#2068f6" }]}
+            lines={[{ dataKey: "active_leases", name: t("活跃租约"), color: palette("accentViolet").color }]}
           />
         </Card>
 
@@ -930,8 +934,8 @@ export function PlatformMonitorPanel({ platform }: { platform: Platform }) {
             emptyText={t("暂无请求统计数据")}
             yTickFormatter={formatShortNumber}
             lines={[
-              { dataKey: "total_requests", name: t("总请求数"), color: "#2467e4" },
-              { dataKey: "success_requests", name: t("成功请求数"), color: "#0f9d8b" },
+              { dataKey: "total_requests", name: t("总请求数"), color: palette("accentBlue").color },
+              { dataKey: "success_requests", name: t("成功请求数"), color: palette("accentTeal").color },
             ]}
           />
           <div className="dashboard-summary-inline">
@@ -951,9 +955,9 @@ export function PlatformMonitorPanel({ platform }: { platform: Platform }) {
             yTickFormatter={formatLatency}
             tooltipValueFormatter={formatLeaseDuration}
             lines={[
-              { dataKey: "p1_ms", name: "P1", color: "#2d63d8" },
-              { dataKey: "p5_ms", name: "P5", color: "#0f9d8b" },
-              { dataKey: "p50_ms", name: "P50", color: "#f18f01" },
+              { dataKey: "p1_ms", name: "P1", color: palette("accentIndigo").color },
+              { dataKey: "p5_ms", name: "P5", color: palette("accentTeal").color },
+              { dataKey: "p50_ms", name: "P50", color: palette("accentOrange").color },
             ]}
           />
         </Card>

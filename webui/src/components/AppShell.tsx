@@ -21,6 +21,7 @@ import { useAuthStore } from "../features/auth/auth-store";
 import { getEnvConfig } from "../features/systemConfig/api";
 import { useI18n } from "../i18n";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { ThemeToggle } from "./ThemeToggle";
 
 type NavItem = {
   label: string;
@@ -154,6 +155,7 @@ export function AppShell() {
               <span className="sidebar-tool-spacer" aria-hidden="true" />
             )}
             <LanguageSwitcher className="sidebar-locale" compact />
+            <ThemeToggle compact />
           </div>
         </div>
       </aside>

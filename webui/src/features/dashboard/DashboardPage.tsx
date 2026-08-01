@@ -8,6 +8,7 @@ import { Select } from "../../components/ui/Select";
 import { useI18n } from "../../i18n";
 import { getCurrentLocale, isEnglishLocale } from "../../i18n/locale";
 import { formatApiErrorMessage } from "../../lib/error-message";
+import { useChartColors, useSeriesPalette } from "../theme/chart-tokens";
 import {
   type DashboardGlobalHistoryData,
   type DashboardGlobalRealtimeData,
@@ -436,6 +437,7 @@ function TrendTooltipContent({ active, payload, label, series, valueFormatter }:
 
 function TrendChart({ labels, series, formatYAxisLabel }: TrendChartProps) {
   const { t } = useI18n();
+  const colors = useChartColors();
   const safeSeries = sanitizeSeries(series);
   const sampled = downsampleTrendInput(labels, safeSeries, MAX_TREND_POINTS);
   const yLabelFormatter = formatYAxisLabel ?? formatShortNumber;
@@ -480,19 +482,19 @@ function TrendChart({ labels, series, formatYAxisLabel }: TrendChartProps) {
               </defs>
             ) : null}
 
-            <CartesianGrid stroke="rgba(65, 87, 121, 0.16)" strokeDasharray="2 4" vertical={false} />
+            <CartesianGrid stroke={colors.gridStroke} strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="sortKey" type="number" scale="time" domain={["dataMin", "dataMax"]} hide />
             <YAxis
               width="auto"
               tickMargin={4}
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#657691", fontSize: 11, fontWeight: 600 }}
+              tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
               tickFormatter={(value) => yLabelFormatter(Number(value))}
               domain={[0, "auto"]}
             />
             <Tooltip
-              cursor={{ stroke: "rgba(15, 94, 216, 0.34)", strokeWidth: 1 }}
+              cursor={{ stroke: colors.tooltipCursorStroke, strokeWidth: 1 }}
               wrapperStyle={{ outline: "none" }}
               content={<TrendTooltipContent series={trendSeries} valueFormatter={yLabelFormatter} />}
             />
@@ -506,7 +508,7 @@ function TrendChart({ labels, series, formatYAxisLabel }: TrendChartProps) {
                 fill={`url(#${gradientId})`}
                 strokeWidth={1.8}
                 dot={false}
-                activeDot={{ r: 3, stroke: "#ffffff", strokeWidth: 1, fill: leadingSeries.color }}
+                activeDot={{ r: 3, stroke: colors.dotStroke, strokeWidth: 1, fill: leadingSeries.color }}
                 isAnimationActive={false}
                 connectNulls
               />
@@ -521,7 +523,7 @@ function TrendChart({ labels, series, formatYAxisLabel }: TrendChartProps) {
                 stroke={item.color}
                 strokeWidth={1.8}
                 dot={false}
-                activeDot={{ r: 3, stroke: "#ffffff", strokeWidth: 1, fill: item.color }}
+                activeDot={{ r: 3, stroke: colors.dotStroke, strokeWidth: 1, fill: item.color }}
                 isAnimationActive={false}
                 connectNulls
               />
@@ -581,6 +583,7 @@ function compressHistogram(buckets: LatencyBucket[], limit = MAX_HISTOGRAM_BUCKE
 
 function Histogram({ buckets }: { buckets: LatencyBucket[] }) {
   const { t } = useI18n();
+  const colors = useChartColors();
   const gradientId = `histogram-gradient-${useId().replace(/:/g, "")}`;
 
   if (!buckets.length) {
@@ -631,12 +634,12 @@ function Histogram({ buckets }: { buckets: LatencyBucket[] }) {
         <BarChart data={data} margin={chartMargin}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2388ff" stopOpacity={0.94} />
-              <stop offset="100%" stopColor="#0f5ed8" stopOpacity={0.88} />
+              <stop offset="0%" stopColor={colors.barTop} stopOpacity={0.94} />
+              <stop offset="100%" stopColor={colors.barBottom} stopOpacity={0.88} />
             </linearGradient>
           </defs>
 
-          <CartesianGrid stroke="rgba(65, 87, 121, 0.16)" strokeDasharray="2 4" vertical={false} />
+          <CartesianGrid stroke={colors.gridStroke} strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="label"
             interval="preserveStartEnd"
@@ -644,7 +647,7 @@ function Histogram({ buckets }: { buckets: LatencyBucket[] }) {
             tickMargin={4}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#607191", fontSize: 11, fontWeight: 600 }}
+            tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
             tickFormatter={(value) => formatLatencyAxisTick(Number(value))}
           />
           <YAxis
@@ -653,11 +656,11 @@ function Histogram({ buckets }: { buckets: LatencyBucket[] }) {
             tickMargin={4}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#607191", fontSize: 11, fontWeight: 600 }}
+            tick={{ fill: colors.axisTick, fontSize: 11, fontWeight: 600 }}
             tickFormatter={(value) => formatShortNumber(Number(value))}
           />
           <Tooltip
-            cursor={{ fill: "rgba(15, 94, 216, 0.08)" }}
+            cursor={{ fill: colors.tooltipCursorFill }}
             wrapperStyle={{ outline: "none" }}
             content={<HistogramTooltipContent />}
           />
@@ -666,7 +669,7 @@ function Histogram({ buckets }: { buckets: LatencyBucket[] }) {
             fill={`url(#${gradientId})`}
             radius={[5, 5, 0, 0]}
             maxBarSize={28}
-            activeBar={{ fill: "#0d63dd", stroke: "#f2f7ff", strokeWidth: 1.2 }}
+            activeBar={{ fill: colors.activeBarFill, stroke: colors.activeBarStroke, strokeWidth: 1.2 }}
             isAnimationActive={false}
           />
         </BarChart>
@@ -712,6 +715,7 @@ function historyRefreshMsFromBuckets(bucketSeconds: Array<number | undefined>): 
 
 export function DashboardPage() {
   const { t } = useI18n();
+  const palette = useSeriesPalette();
   const [rangeKey, setRangeKey] = useState<RangeKey>("6h");
   const queryClient = useQueryClient();
 
@@ -979,23 +983,23 @@ export function DashboardPage() {
               {
                 name: t("下载速率"),
                 values: throughputIngress,
-                color: "#1076ff",
-                fillColor: "rgba(16, 118, 255, 0.14)",
+                color: palette("primary").color,
+                fillColor: palette("primary").fillColor,
               },
               {
                 name: t("上传速率"),
                 values: throughputEgress,
-                color: "#00a17f",
+                color: palette("secondary").color,
               },
             ]}
           />
           <div className="dashboard-legend">
             <span>
-              <i style={{ background: "#1076ff" }} />
+              <i style={{ background: palette("primary").color }} />
               {t("下载速率")}
             </span>
             <span>
-              <i style={{ background: "#00a17f" }} />
+              <i style={{ background: palette("secondary").color }} />
               {t("上传速率")}
             </span>
           </div>
@@ -1013,23 +1017,23 @@ export function DashboardPage() {
               {
                 name: t("入站连接"),
                 values: connectionsInbound,
-                color: "#2467e4",
-                fillColor: "rgba(36, 103, 228, 0.12)",
+                color: palette("accentBlue").color,
+                fillColor: palette("accentBlue").fillColor,
               },
               {
                 name: t("出站连接"),
                 values: connectionsOutbound,
-                color: "#f18f01",
+                color: palette("accentOrange").color,
               },
             ]}
           />
           <div className="dashboard-legend">
             <span>
-              <i style={{ background: "#2467e4" }} />
+              <i style={{ background: palette("accentBlue").color }} />
               {t("入站连接")}
             </span>
             <span>
-              <i style={{ background: "#f18f01" }} />
+              <i style={{ background: palette("accentOrange").color }} />
               {t("出站连接")}
             </span>
           </div>
@@ -1056,13 +1060,13 @@ export function DashboardPage() {
               {
                 name: t("节点总数"),
                 values: nodeTotal,
-                color: "#2d63d8",
-                fillColor: "rgba(45, 99, 216, 0.11)",
+                color: palette("accentIndigo").color,
+                fillColor: palette("accentIndigo").fillColor,
               },
               {
                 name: t("健康节点数"),
                 values: nodeHealthy,
-                color: "#0c9f68",
+                color: palette("accentGreen").color,
               },
             ]}
           />
@@ -1080,12 +1084,12 @@ export function DashboardPage() {
               {
                 name: t("总请求数"),
                 values: requestTotals,
-                color: "#2467e4",
+                color: palette("accentBlue").color,
               },
               {
                 name: t("成功请求数"),
                 values: requestSuccesses,
-                color: "#0f9d8b",
+                color: palette("accentTeal").color,
               },
             ]}
           />
@@ -1107,13 +1111,13 @@ export function DashboardPage() {
               {
                 name: t("下载流量"),
                 values: trafficIngress,
-                color: "#2068f6",
-                fillColor: "rgba(32, 104, 246, 0.12)",
+                color: palette("accentViolet").color,
+                fillColor: palette("accentViolet").fillColor,
               },
               {
                 name: t("上传流量"),
                 values: trafficEgress,
-                color: "#0f9d8b",
+                color: palette("accentTeal").color,
               },
             ]}
           />
@@ -1134,8 +1138,8 @@ export function DashboardPage() {
               {
                 name: t("探测次数"),
                 values: probeCounts,
-                color: "#e26a2c",
-                fillColor: "rgba(226, 106, 44, 0.16)",
+                color: palette("accentAmber").color,
+                fillColor: palette("accentAmber").fillColor,
               },
             ]}
           />
