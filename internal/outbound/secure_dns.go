@@ -147,16 +147,13 @@ func parseCustomDNSUpstream(raw string, tag string) (secureDNSTransportSpec, boo
 
 	needsLocalResolver := strings.EqualFold(bootstrap, localDNSTransportTag) || dnsUpstreamHostNeedsBootstrap(host)
 	remoteOptions := option.RemoteDNSServerOptions{
-		LocalDNSServerOptions: option.LocalDNSServerOptions{
-			DialerOptions: option.DialerOptions{},
-		},
 		DNSServerAddressOptions: option.DNSServerAddressOptions{
 			Server:     host,
 			ServerPort: port,
 		},
 	}
 	if needsLocalResolver {
-		remoteOptions.LocalDNSServerOptions.DialerOptions.DomainResolver = &option.DomainResolveOptions{
+		remoteOptions.DialerOptions.DomainResolver = &option.DomainResolveOptions{
 			Server: localDNSTransportTag,
 		}
 	}
@@ -321,6 +318,11 @@ func (t *secureDNSFailoverTransport) Start(stage adapter.StartStage) error {
 func (t *secureDNSFailoverTransport) Close() error {
 	return nil
 }
+
+// Reset 实现 adapter.DNSTransport 的 v1.13.x 接口（sing-box 1.13 起 DNSTransport
+// 增加 Reset() 用于关闭既有连接、强制后续请求走新连接）。failover 自身不持有
+// 任何上游连接（连接归被代理的上游 DNSTransport），因此这里是无副作用空实现。
+func (t *secureDNSFailoverTransport) Reset() {}
 
 func (t *secureDNSFailoverTransport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	if len(t.upstreamTags) == 0 {
