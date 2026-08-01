@@ -61,6 +61,15 @@ jobs:
         with:
           go-version: '1.25.x'
 
+      - name: go get gvisor (强制升到 sing-tun 要求的 20250811)
+        # sing-box v1.13.15 的 sing-tun 调用 route.WritePacketDirect 等新 API，
+        # 但 go.sum 旧版 gVisor v0.0.0-20250325 没有这些方法。go mod tidy 看不到
+        # sing-tun/stack_gvisor_icmp.go（其 //go:build with_gvisor 是自定义 tag，
+        # tidy 跳过自定义 tag 文件），所以不会自动升级 gVisor。这里 go get -d
+        # 强制下载新版 + 写入 go.mod/go.sum，再让 tidy 在已升版本基础上跑。
+        run: |
+          go get -d github.com/sagernet/gvisor@v0.0.0-20250811.0-sing-box-mod.1
+
       - name: go mod tidy (补齐 go.sum 中缺失的 h1 条目)
         run: |
           go mod tidy -v
