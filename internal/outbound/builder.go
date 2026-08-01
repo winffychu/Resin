@@ -18,6 +18,7 @@ import (
 	"github.com/sagernet/sing/common"
 	sJson "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
+	"github.com/sagernet/sing/service/pause"
 )
 
 // OutboundBuilder creates outbound instances from raw node options.
@@ -54,6 +55,11 @@ type SingboxBuilder struct {
 func NewSingboxBuilderWithConfig(cfg SingboxBuilderConfig) (*SingboxBuilder, error) {
 	ctx := context.Background()
 	ctx = include.Context(ctx) // inject protocol registries
+	// 注入 pause.Manager。sing-box 在 box.New 里会调 pause.WithDefaultManager，
+	// Resin 直接构造 service graph 跳过了 box.New，因此 v1.13 的 NetworkManager
+	// 启动期间，InterfaceMonitor 的回调 (notifyInterfaceUpdate) 调到
+	// r.pauseManager.NetworkPause() 会 nil panic。这里挂一个默认 manager 即满足。
+	ctx = pause.WithDefaultManager(ctx)
 
 	logFactory := log.NewNOPFactory()
 	logger := logFactory.NewLogger("resin-outbound")
