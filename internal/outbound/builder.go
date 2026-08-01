@@ -14,6 +14,7 @@ import (
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-box/route"
 	"github.com/sagernet/sing/common"
 	sJson "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
@@ -42,6 +43,7 @@ type SingboxBuilder struct {
 	registry            *sbOutbound.Registry
 	ctx                 context.Context
 	logFactory          log.Factory
+	networkManager      *route.NetworkManager
 	dnsTransportManager *dns.TransportManager
 	dnsRouter           *dns.Router
 }
@@ -75,6 +77,29 @@ func NewSingboxBuilderWithConfig(cfg SingboxBuilderConfig) (*SingboxBuilder, err
 	// Outbound Manager (sing-box's own manager, for detour resolution)
 	outboundMgr := sbOutbound.NewManager(logger, service.FromContext[adapter.OutboundRegistry](ctx), endpointMgr, "")
 	service.MustRegister[adapter.OutboundManager](ctx, outboundMgr)
+
+	// Network Manager. sing-box v1.13.x 的 dns/transport/local 在 systemd-resolved
+	// 运行环境下，会调 service.FromContext[adapter.NetworkManager](ctx).InterfaceMonitor()。
+	// v1.12.x 时代这条路径不触发；v1.13.x 起 local transport Start 改为强制探测
+	// systemd-resolved，未注册 NetworkManager 会在带 resolver 的 runner 上 nil panic。
+	// 注册一个 AutoDetectInterface=true 的最小 NetworkManager 即可让 InterfaceMonitor()
+	// 返回有效实例，令 local transport 安全走 dbus 路径（开不了就吞错降级，不 panic）。
+	networkMgr, err := route.NewNetworkManager(ctx, logger, option.RouteOptions{
+		AutoDetectInterface: true,
+	}, option.DNSOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("singbox builder: create network manager: %w", err)
+	}
+	service.MustRegister[adapter.NetworkManager](ctx, networkMgr)
+	// NetworkManager 的 Start 必须先于 dns transport manager 的 Start，
+	// 否则 local transport StartStateInitialize 仍可能拿到未启动的 monitor。
+	if err := networkMgr.Start(adapter.StartStateInitialize); err != nil {
+		return nil, fmt.Errorf("singbox builder: initialize network manager: %w", err)
+	}
+	if err := networkMgr.Start(adapter.StartStateStart); err != nil {
+		_ = networkMgr.Close()
+		return nil, fmt.Errorf("singbox builder: start network manager: %w", err)
+	}
 
 	// DNS Transport Manager
 	dnsTransportMgr := dns.NewTransportManager(logger, service.FromContext[adapter.DNSTransportRegistry](ctx), outboundMgr, secureDNSFailoverTransportTag)
@@ -120,6 +145,7 @@ func NewSingboxBuilderWithConfig(cfg SingboxBuilderConfig) (*SingboxBuilder, err
 		registry:            registry,
 		ctx:                 ctx,
 		logFactory:          logFactory,
+		networkManager:      networkMgr,
 		dnsTransportManager: dnsTransportMgr,
 		dnsRouter:           dnsRouter,
 	}, nil
@@ -169,6 +195,9 @@ func (b *SingboxBuilder) Close() error {
 	}
 	if b.dnsTransportManager != nil {
 		errs = append(errs, b.dnsTransportManager.Close())
+	}
+	if b.networkManager != nil {
+		errs = append(errs, b.networkManager.Close())
 	}
 	return errors.Join(errs...)
 }
