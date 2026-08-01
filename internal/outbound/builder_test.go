@@ -704,6 +704,10 @@ func (t *staticDNSTransport) Close() error {
 	return nil
 }
 
+// Reset 实现 adapter.DNSTransport 的 v1.13.x 接口（测试替身需同形以被作为
+// DNSTransport 传入）。此 stub 不持有连接，Reset 是无副作用空实现。
+func (t *staticDNSTransport) Reset() {}
+
 func (t *staticDNSTransport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	t.calls.Add(1)
 	if t.err != nil {
